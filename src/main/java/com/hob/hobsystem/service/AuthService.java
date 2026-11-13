@@ -80,6 +80,7 @@ public class AuthService {
         String phone = normalizePhone(key);          // +639..., 09... and 9... all find the same account
         Customer c = phone == null ? null : repo.findByContactNumber(phone);
         if (c == null && phone != null) c = repo.findByContactNumber("0" + phone.substring(3));   // older accounts saved as 09...
+        if (c == null) c = repo.findByContactNumber(key);   // seeded accounts such as "staff" and "owner"
         if (c == null) c = repo.findByCustomerNo(key);
         if (c == null) c = repo.findByEmail(key.toLowerCase());
         String attemptKey = c != null ? "c" + c.getId() : "x" + key.toLowerCase();
