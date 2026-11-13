@@ -411,7 +411,7 @@ function vAuth(){const t=authTab,lg=t=="login"||t=="signup",locked=lockUntil>Dat
  return `<div class="authpage"><aside class="authhero"><div class="bn"><span class="lg"><img src="${LOGO}" alt="House of Brew logo"></span>House of Brew</div>
  <div><p class="eb">Orders &amp; Reservations</p><h2>Good food.<br>Better company.</h2><p class="sub">Order ahead, reserve your favorite table, and spend less time waiting for the good part.</p></div>
  <div class="hrs">Open daily · 6:00 PM — 3:00 AM</div></aside>
- <main class="authside"><div class="panel authbox"><p class="eb">${lg?"Welcome in to House of Brew":"Account help"}</p><h2>${lg?"Your table is waiting.":"Reset your password"}</h2>${tabs}${body}<p class="empty" style="text-align:center;margin-top:14px">${REQ} Required field</p></div></main></div>`}
+ <main class="authside"><div class="panel authbox"><p class="eb">${lg?"Welcome to House of Brew":"Account help"}</p><h2>${lg?"Your table is waiting.":"Reset your password"}</h2>${tabs}${body}<p class="empty" style="text-align:center;margin-top:14px">${REQ} Required field</p></div></main></div>`}
 
 /* ---------- actions ---------- */
 function confirmBox(title,text,yes,no,onYes){const ov=document.createElement("div");ov.className="ov";
