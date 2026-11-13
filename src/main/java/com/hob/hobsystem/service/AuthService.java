@@ -56,9 +56,10 @@ public class AuthService {
         String l = cleanName(lastName, true, "last name");
         String e = normalizeEmail(email);
         if (e == null) throw bad("Enter a valid email address.");
-        if (contact == null || !contact.matches("\\d{11}")) throw bad("The contact number must be exactly 11 digits.");
+        contact = normalizePhone(contact);
+        if (contact == null) throw bad("Enter a valid mobile number: +63 followed by 10 digits, for example +639123456789.");
         checkPassword(password);
-        if (repo.findByContactNumber(contact) != null)
+        if (repo.findByContactNumber(contact) != null || repo.findByContactNumber("0" + contact.substring(3)) != null)
             throw conflict("That contact number is already registered. Please log in.");
         if (repo.findByEmail(e) != null)
             throw conflict("That email is already registered. Please log in.");
@@ -76,7 +77,9 @@ public class AuthService {
     public Session login(String idOrContact, String password) {
         if (idOrContact == null || password == null) throw bad("Enter your ID, email or contact number and the password.");
         String key = idOrContact.trim();
-        Customer c = repo.findByContactNumber(key);
+        String phone = normalizePhone(key);          // +639..., 09... and 9... all find the same account
+        Customer c = phone == null ? null : repo.findByContactNumber(phone);
+        if (c == null && phone != null) c = repo.findByContactNumber("0" + phone.substring(3));   // older accounts saved as 09...
         if (c == null) c = repo.findByCustomerNo(key);
         if (c == null) c = repo.findByEmail(key.toLowerCase());
         String attemptKey = c != null ? "c" + c.getId() : "x" + key.toLowerCase();
@@ -160,7 +163,7 @@ public class AuthService {
         m.put("middleName", c.getMiddleName());
         m.put("lastName", c.getLastName());
         m.put("email", c.getEmail());
-        m.put("contactNumber", c.getContactNumber());
+        m.put("contactNumber", shownPhone(c.getContactNumber()));
         m.put("role", c.getUserRole());
         return m;
     }
@@ -180,7 +183,7 @@ public class AuthService {
         m.put("firstName", c.getFirstName());
         m.put("middleName", c.getMiddleName());
         m.put("lastName", c.getLastName());
-            m.put("contactNumber", c.getContactNumber());
+            m.put("contactNumber", shownPhone(c.getContactNumber()));
             m.put("email", c.getEmail());
             out.add(m);
         }
@@ -203,6 +206,22 @@ public class AuthService {
             case "STAFF" -> new StaffAccount(c.getId(), c.getCustomerNo(), c.getName());
             default -> new CustomerAccount(c.getId(), c.getCustomerNo(), c.getName());
         };
+    }
+
+    /** Philippine mobile numbers are always kept as +63 followed by 10 digits. Returns null if the number is not valid. */
+    static String normalizePhone(String raw) {
+        if (raw == null) return null;
+        String d = raw.replaceAll("[\\s\\-()]", "");
+        if (d.startsWith("+63")) d = d.substring(3);
+        else if (d.startsWith("63") && d.length() == 12) d = d.substring(2);
+        else if (d.startsWith("0")) d = d.substring(1);
+        return d.matches("9\\d{9}") ? "+63" + d : null;
+    }
+
+    /** Old accounts saved as 09xxxxxxxxx are shown in the +63 form too. */
+    private static String shownPhone(String stored) {
+        String n = normalizePhone(stored);
+        return n != null ? n : stored;
     }
 
     private void seed(String contact, String role, String name, String password, String no) {

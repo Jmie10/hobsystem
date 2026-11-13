@@ -180,6 +180,7 @@ input:not([type=checkbox]):not([type=radio]),select{height:42px}
 .Completed{color:var(--ok)}
 @media(max-width:940px){.shell{gap:0;background:linear-gradient(to right,var(--card) 0,var(--card) calc(var(--sw,112px) - 1px),var(--line) calc(var(--sw,112px) - 1px),var(--line) var(--sw,112px),transparent var(--sw,112px))}.side{border-right:0}.content{padding:12px}}
 @media(max-width:560px){.shell{--sw:72px}}
+.phone{display:flex}.phone .pre{display:flex;align-items:center;padding:0 12px;border:1px solid var(--line);border-right:0;border-radius:8px 0 0 8px;background:var(--line);font-weight:600}.phone input{border-radius:0 8px 8px 0}
 </style>
 </head>
 <body>
@@ -427,7 +428,7 @@ function vAuth(){const t=authTab,lg=t=="login"||t=="signup",locked=lockUntil>Dat
   <fieldset class="fs" ${locked?"disabled":""}><label for="li">Customer ID, email or contact number ${REQ}</label><input id="li" autocomplete="username"><label for="lp">Password ${REQ}</label>${pw("lp","current-password")}
   <button class="btn p" id="dologin" style="width:100%;margin-top:12px">Log in</button></fieldset><div class="fmsg" id="fm-login"></div><p style="margin:14px 0 0;text-align:center"><button class="link" data-at="forgot">Forgot password?</button></p></div>`,
   signup:`<div data-enter="dosignup"><div class="names"><div><label for="sf">First name ${REQ}</label><input id="sf" maxlength="40" data-name="1" autocomplete="given-name"></div><div><label for="sm">Middle name</label><input id="sm" maxlength="40" data-name="1" autocomplete="additional-name"></div><div><label for="sl">Last name ${REQ}</label><input id="sl" maxlength="40" data-name="1" autocomplete="family-name"></div></div>
-  <label for="se">Email ${REQ}</label><input id="se" type="email" maxlength="120" autocomplete="email"><label for="sc">Contact number (11 digits) ${REQ}</label><input id="sc" inputmode="numeric" maxlength="11" data-digits="1" placeholder="09XXXXXXXXX" autocomplete="tel"><label for="sp">Password ${REQ}</label>${pw("sp","new-password")}${meter("sp")}
+  <label for="se">Email ${REQ}</label><input id="se" type="email" maxlength="120" autocomplete="email"><label for="sc">Contact number ${REQ}</label><div class="phone"><span class="pre">+63</span><input id="sc" inputmode="numeric" maxlength="13" data-digits="1" placeholder="9XXXXXXXXX" autocomplete="tel-national"></div><small class="empty">10 digits after +63, for example 9123456789.</small><label for="sp">Password ${REQ}</label>${pw("sp","new-password")}${meter("sp")}
   <button class="btn p" id="dosignup" style="width:100%;margin-top:12px">Create account</button><div class="fmsg" id="fm-signup"></div><p class="empty" style="text-align:center">Your Customer ID is generated automatically.</p></div>`,
   forgot:`<div data-enter="doforgot"><p class="empty">Enter the email on your account. We will send a 6-digit code.</p><label for="fe">Email ${REQ}</label><input id="fe" type="email" autocomplete="email" value="${esc(resetEmail)}">
   <button class="btn p" id="doforgot" style="width:100%;margin-top:12px">Send code</button><div class="fmsg" id="fm-forgot"></div><p style="margin:14px 0 0;text-align:center"><button class="link" data-at="reset">I already have a code</button> · <button class="link" data-at="login">Back to log in</button></p></div>`,
@@ -462,9 +463,9 @@ async function doAuth(path,body){const where=path.endsWith("signup")?"fm-signup"
 function doSignup(){const f=$("sf").value.trim(),m=$("sm").value.trim(),l=$("sl").value.trim(),e=$("se").value.trim(),c=$("sc").value.trim(),p=$("sp").value,W="fm-signup";
  if(!f||!l){flash("Enter your first name and last name.",W);return}
  if(!e){flash("Enter your email.",W);return}
- if(!/^\d{11}$/.test(c)){flash("The contact number must be exactly 11 digits.",W);return}
+ if(!/^9\d{9}$/.test(c)){flash("Enter your mobile number after +63: 10 digits starting with 9, for example 9123456789.",W);return}
  if(strength(p)<1){flash("The password is too weak. Use at least 8 characters with letters and numbers.",W);return}
- return doAuth("/api/auth/signup",{firstName:f,middleName:m,lastName:l,email:e,contactNumber:c,password:p})}
+ return doAuth("/api/auth/signup",{firstName:f,middleName:m,lastName:l,email:e,contactNumber:"+63"+c,password:p})}
 async function doForgot(){try{resetEmail=$("fe").value.trim();const r=await api("/api/auth/forgot","POST",{email:resetEmail});authTab="reset";draw();flash(r.message,"fm-reset")}catch(e){flash(e.message,"fm-forgot")}}
 async function doReset(){if(strength($("rp").value)<1){flash("The password is too weak. Use at least 8 characters with letters and numbers.","fm-reset");return}
  try{const r=await api("/api/auth/reset","POST",{email:$("re").value.trim(),code:$("rc").value.trim(),newPassword:$("rp").value});authTab="login";draw();flash(r.message,"fm-login")}catch(e){flash(e.message,"fm-reset")}}
@@ -523,6 +524,7 @@ function bind(){const a=$("app");
  a.onkeydown=e=>{if(e.key!="Enter"||e.target.tagName!="INPUT")return;const z=e.target.closest("[data-enter]");if(z){e.preventDefault();const b=$(z.dataset.enter);if(b)b.click()}};
  a.oninput=e=>{const t=e.target;
   if(t.dataset.digits)t.value=t.value.replace(/\D/g,"");
+  if(t.id=="sc"){let v=t.value;if(v.length>10&&v.startsWith("63"))v=v.slice(2);if(v.startsWith("0"))v=v.slice(1);t.value=v.slice(0,10)}
   if(t.dataset.name)t.value=t.value.replace(/[^\p{L} .'-]/gu,"");
   if(t.id=="onotes")NOTES=t.value;
   if(t.id=="sp"||t.id=="np"||t.id=="rp")updMeter(t.id);
