@@ -120,7 +120,9 @@ body:not(.auth){overflow:hidden}
 .item{padding:0;gap:0;overflow:hidden}
 .item .ph{background:#f3ece4;aspect-ratio:4/3;display:flex;align-items:center;justify-content:center}
 .item .ph{position:relative;overflow:hidden}
-.item .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block}
+.item .ph img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.item .ph.dr{aspect-ratio:3/4;background:#f1f4f8}
+.item .ph.dr img{object-position:50% 42%}
 .item .ph svg{width:84px;height:84px}
 .item .bd{padding:10px 12px 12px;display:flex;flex-direction:column;gap:6px;flex:1}
 .item .ds{font-size:13px;line-height:1.35;color:var(--mute);min-height:2.7em}
@@ -339,7 +341,7 @@ const dsc=m=>{const d=DESC[baseName(m.n).toLowerCase()];if(d)return d;const t=/\
 const isFlav=m=>/^flavored fries/i.test(m.n);
 const tl=o=>o.type=="Takeout"?"Takeout":"Table "+o.t;
 function card(m){const s=imgSlug(m.n),q=QTY[m.id]||1;
- return `<div class="item ${m.on?"":"off"}"><div class="ph">${HAS.has(s)?`<img src="img/menu/${s}.jpg" alt="${esc(baseName(m.n))}" loading="lazy">`:icon(m)}</div>
+ return `<div class="item ${m.on?"":"off"}"><div class="ph ${/^(Coffee Based|Non Coffee|Soda)$/.test(m.c)?"dr":""}">${HAS.has(s)?`<img src="img/menu/${s}.jpg" alt="${esc(baseName(m.n))}" loading="lazy">`:icon(m)}</div>
  <div class="bd"><b>${esc(m.n)}</b><span class="ds">${esc(dsc(m))}</span>
  ${isFlav(m)&&m.on?`<label class="fl">Flavor<select data-fl="${m.id}" aria-label="Fries flavor">${FLAVORS.map(f=>`<option ${f==(FL[m.id]||FLAVORS[0])?"selected":""}>${f}</option>`).join("")}</select></label>`:""}
  <div class="buy"><span class="price">${peso(m.p)}</span>${m.on?`<span class="step"><button data-qs="${m.id}:-1" aria-label="Less">&minus;</button><span>${q}</span><button data-qs="${m.id}:1" aria-label="More">+</button></span><button class="btn p" data-add="${m.id}">Add to order</button>`:`<span class="empty">Sold out today</span>`}</div></div></div>`}
