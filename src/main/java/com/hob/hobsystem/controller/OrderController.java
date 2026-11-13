@@ -28,6 +28,9 @@ public class OrderController {
         return o;
     }
 
+    @PostMapping("/my/orders/{id}/cancel")
+    public void cancelMine(@PathVariable("id") Long id, @RequestAttribute("auth") AuthUser user) { orders.cancelOwn(user, id); }
+
     @PostMapping("/kitchen/start-next")
     public OrderEntity startNext() { return orders.startNext(); }
 

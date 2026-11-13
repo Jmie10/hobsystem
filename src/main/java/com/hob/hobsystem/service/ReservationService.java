@@ -33,7 +33,7 @@ public class ReservationService {
     public ReservationService(ReservationRepository repo, WaitlistRepository waitRepo) {
         this.repo = repo;
         this.waitRepo = waitRepo;
-        for (Reservation r : repo.findAllByOrderByIdAsc()) if (!"Cancelled".equals(r.getStatus())) index(r);
+        for (Reservation r : repo.findAllByOrderByIdAsc()) if (!"Cancelled".equals(r.getStatus()) && !"Completed".equals(r.getStatus())) index(r);
         waitlist.addAll(waitRepo.findAllByOrderByIdAsc());
     }
 
@@ -85,10 +85,47 @@ public class ReservationService {
     /** Cancels a booking, frees the table, and gives it to the first matching person on the waitlist. */
     public synchronized Reservation cancel(Long id) {
         Reservation r = get(id);
-        if ("Cancelled".equals(r.getStatus())) return r;
+        if ("Cancelled".equals(r.getStatus()) || "Completed".equals(r.getStatus())) return r;
         r.setStatus("Cancelled");
         repo.save(r);
         unindex(r);
+        promoteWaitlist(r);
+        return r;
+    }
+
+    /** A customer cancels their own booking. Only possible before the staff confirms it. */
+    public synchronized Reservation cancelOwn(AuthUser u, Long id) {
+        Reservation r = get(id);
+        if (!u.getId().equals(r.getCustomerId()))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "That is not your reservation.");
+        if (!"Pending".equals(r.getStatus()))
+            throw conflict("Too late to cancel: this booking is already " + r.getStatus().toLowerCase() + ".");
+        return cancel(id);
+    }
+
+    /** Staff cancel: only allowed before the booking is confirmed. */
+    public synchronized Reservation cancelPending(Long id) {
+        Reservation r = get(id);
+        if ("Confirmed".equals(r.getStatus()))
+            throw conflict("This booking is already confirmed. Use Mark as available when the guests are done.");
+        if ("Completed".equals(r.getStatus()))
+            throw conflict("This booking is already finished.");
+        return cancel(id);
+    }
+
+    /** Guests are done eating: the table becomes available again (and the waitlist gets the slot). */
+    public synchronized Reservation complete(Long id) {
+        Reservation r = get(id);
+        if (!"Confirmed".equals(r.getStatus()))
+            throw bad("Only a confirmed booking can be marked as available.");
+        r.setStatus("Completed");
+        repo.save(r);
+        unindex(r);
+        promoteWaitlist(r);
+        return r;
+    }
+
+    private void promoteWaitlist(Reservation r) {
         Iterator<WaitlistEntry> it = waitlist.iterator();
         while (it.hasNext()) {
             WaitlistEntry w = it.next();
@@ -102,7 +139,6 @@ public class ReservationService {
                 break;
             }
         }
-        return r;
     }
 
     public synchronized WaitlistEntry join(AuthUser u, String date, String time, int guests) {

@@ -74,6 +74,17 @@ public class OrderService {
         return repo.save(o);
     }
 
+    /** A customer cancels their own order. Only possible while it is still waiting (Pending). */
+    public synchronized void cancelOwn(AuthUser u, Long id) {
+        OrderEntity o = get(id);
+        if (!u.getId().equals(o.getCustomerId()))
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "That is not your order.");
+        if (!"Pending".equals(o.getStatus()))
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Too late to cancel: the kitchen already started this order.");
+        kitchenQueue.remove(id);
+        repo.delete(o);
+    }
+
     /** Used by Undo: removes an order that is still waiting in the queue. */
     public synchronized void undoPlace(Long id) {
         OrderEntity o = repo.findById(id).orElse(null);

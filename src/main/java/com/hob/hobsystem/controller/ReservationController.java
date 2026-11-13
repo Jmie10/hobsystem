@@ -38,7 +38,13 @@ public class ReservationController {
     public Reservation confirm(@PathVariable("id") Long id) { return res.confirm(id); }
 
     @PostMapping("/reservations/{id}/cancel")
-    public Reservation cancel(@PathVariable("id") Long id) { return res.cancel(id); }
+    public Reservation cancel(@PathVariable("id") Long id) { return res.cancelPending(id); }
+
+    @PostMapping("/my/reservations/{id}/cancel")
+    public Reservation cancelMine(@PathVariable("id") Long id, @RequestAttribute("auth") AuthUser user) { return res.cancelOwn(user, id); }
+
+    @PostMapping("/reservations/{id}/complete")
+    public Reservation complete(@PathVariable("id") Long id) { return res.complete(id); }
 
     @GetMapping("/waitlist")
     public List<WaitlistEntry> waitlist(@RequestAttribute("auth") AuthUser user) {

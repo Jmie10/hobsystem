@@ -95,6 +95,7 @@ input,select,textarea{width:100%;padding:9px 10px;border:1px solid var(--line);b
 .side{display:flex;flex-direction:column;background:var(--card);border-right:1px solid var(--line);height:100vh;height:100dvh;overflow-y:auto}
 .nav{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:16px 4px;border:0;border-left:4px solid transparent;background:transparent;color:var(--ink);font:inherit;font-size:14px;cursor:pointer;text-align:center;width:100%;border-radius:0}
 .nav:hover{background:var(--bg)}
+.nav{font-size:12px;letter-spacing:-.1px}
 .nav[aria-pressed="true"]{border-left-color:var(--pri);background:var(--bg);font-weight:700}
 .fmsg:empty{display:none}.fmsg .msg{margin:10px 0 0}
 .req{color:var(--bad);font-weight:700}
@@ -159,6 +160,7 @@ textarea{resize:none;font:inherit}
 .side{gap:8px;padding:6px 0 12px}
 .nav{width:86px;height:86px;margin:0 auto;padding:8px 4px;border:0;border-radius:18px;transition:background .15s,color .15s}
 .nav:hover{background:var(--bg)}
+.nav{font-size:12px;letter-spacing:-.1px}
 .nav[aria-pressed="true"]{background:var(--pri);color:var(--pri-ink);font-weight:600}
 @media(max-width:560px){.nav{width:62px;height:66px;font-size:11px;border-radius:14px}}
 @media(max-width:940px){
@@ -169,6 +171,13 @@ textarea{resize:none;font:inherit}
  .topbar h1{font-size:20px}
  .authpage{grid-template-columns:minmax(0,1fr)}.authhero{padding:24px;min-height:300px}.authhero .sub{display:none}.authside{padding:24px 18px}
 }
+
+/* ---- fixes: field heights, mobile sidebar column, completed tag, receipt scroll ---- */
+input:not([type=checkbox]):not([type=radio]),select{height:42px}
+.dlg.rc{max-height:92vh;overflow-y:auto}
+.Completed{color:var(--ok)}
+@media(max-width:940px){.shell{gap:0;background:linear-gradient(to right,var(--card) 0,var(--card) calc(var(--sw,112px) - 1px),var(--line) calc(var(--sw,112px) - 1px),var(--line) var(--sw,112px),transparent var(--sw,112px))}.side{border-right:0}.content{padding:12px}}
+@media(max-width:560px){.shell{--sw:72px}}
 </style>
 </head>
 <body>
@@ -188,17 +197,18 @@ const today=()=>new Date().toISOString().slice(0,10);
 const $=id=>document.getElementById(id);
 let role="Customer",tab="Order",cat="All",cart={},selT=null,rf={date:today(),time:"18:00",guests:2};
 const PG={},BF={from:"",to:"",status:"All",sort:"new"},Q={menu:"",omenu:"",ocat:"All"};
-const TABS={Customer:["Order","Reserve","Activity"],Staff:["Kitchen","Reservations","Billing"],Admin:["Menu","Billing","Customers","Reports"]};
+const TABS={Customer:["Order","Reserve","Activity"],Staff:["Kitchen","Reservations","Billing","Menu"],Admin:["Menu","Billing","Customers","Reports"]};
 const REQ='<span class="req" aria-hidden="true">*</span>';
 const FLOW=["Pending","Preparing","Ready","Served"];
 
 /* ---------- talking to the Spring Boot API ---------- */
+const ERRMSG={400:"Some details are missing or incorrect. Please check and try again.",401:"Please log in again.",403:"Your account cannot do this action.",404:"We could not find that. Please refresh the page and try again.",409:"That conflicts with an existing record. Please refresh and try again.",429:"Too many attempts. Please wait a moment and try again.",500:"Something went wrong on our side. Please try again in a moment.",502:"The server is waking up. Please wait a few seconds and try again.",503:"The server is waking up. Please wait a few seconds and try again."};
 async function api(path,method="GET",body){
  const h={"Content-Type":"application/json"};if(TOKEN)h.Authorization="Bearer "+TOKEN;
- const r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined});
+ let r;try{r=await fetch(path,{method,headers:h,body:body?JSON.stringify(body):undefined})}catch(e){throw new Error("Cannot reach the server. Check your internet connection and try again.")}
  let d=null;try{d=await r.json()}catch(e){}
  if(r.status==401&&TOKEN){clearLogin();draw()}
- if(!r.ok){const er=new Error((d&&d.message)||("Request failed ("+r.status+")"));if(d&&d.retryAfter)er.retryAfter=d.retryAfter;throw er}
+ if(!r.ok){const er=new Error((d&&d.message)||ERRMSG[r.status]||"Something went wrong. Please try again.");if(d&&d.retryAfter)er.retryAfter=d.retryAfter;throw er}
  return d}
 function clearLogin(){TOKEN=null;ME=null;U=[];cart={};ddOpen=false;try{localStorage.removeItem("hobtoken")}catch(e){}}
 async function load(){
@@ -253,7 +263,7 @@ function draw(){
  document.body.classList.toggle("auth",!ME);
  if(!ME){$("app").innerHTML=vAuth();bind();return}
  TABLES.forEach(t=>{const x=TB.find(z=>z.no==t.no);t.status=x?x.status:"Available"});
- const un=role=="Customer"&&U.length?`<div class="undo"><button class="btn" id="undo">Undo: ${esc(U[U.length-1].label)}</button></div>`:"";
+ const un="";
  const nav=`<nav class="side" aria-label="Main menu"><span class="lg"><img src="${LOGO}" alt="House of Brew logo"></span>${TABS[role].map(t=>`<button class="nav" aria-pressed="${t==tab}" data-t="${t}">${NAVI[t]}<span>${t}</span></button>`).join("")}</nav>`;
  const v={Order:vOrder,Reserve:vReserve,Activity:vActivity,Kitchen:vKitchen,Reservations:vRes,Billing:vBill,Menu:vMenu,Reports:vRep,Customers:vCustomers,Account:vAccount}[tab]();
  $("app").innerHTML=`<div class="shell">${nav}<div class="content"><div class="topbar"><h1>Orders and Reservations</h1><div class="who" id="roles"></div></div>${un}<div class="view ${tab=="Order"?"fit":""}">${v}</div></div></div>`;
@@ -293,6 +303,19 @@ function icon(m){const n=m.n;
  const col=(DRINK.find(d=>d[0].test(n))||[0,"#8b5a3c"])[1];
  return /\(Hot\)/.test(n)?hotCup(col):icedCup(col,m.c=="Soda")}
 
+/* order receipt */
+function showOrderReceipt(o){const ov=document.createElement("div");ov.className="ov";
+ const row=(a,b)=>`<div class="row"><span>${a}</span><b>${esc(String(b))}</b></div>`;
+ ov.innerHTML=`<div class="dlg rc" role="dialog" aria-modal="true" aria-labelledby="rt1"><h2 id="rt1">House of Brew</h2><p style="margin-bottom:8px">${o.paid?"Official receipt":"Order summary (not paid yet)"}</p>
+ ${row("Order no.","#"+String(o.id).padStart(4,"0"))}${row("Customer",o.name)}${row("Customer ID",o.cno||"-")}${row("Date",fdt(o.paid?o.paidAt:o.at))}${row("Order type",tl(o))}
+ <div style="margin:8px 0;border-top:1px dashed var(--line)"></div>
+ ${o.items.map(i=>`<div class="row"><span>${esc(i.n)} × ${i.q}</span><b>${peso(i.p*i.q)}</b></div>`).join("")}
+ <div class="row"><span><b>Total</b></span><b style="font-size:18px">${peso(total(o))}</b></div>
+ ${o.notes?`<p class="empty" style="margin:8px 0 0"><b>Note:</b> ${esc(o.notes)}</p>`:""}
+ <p class="empty" style="margin:10px 0 0">${o.paid?"Paid. Thank you for dining with us!":"Not paid yet. Please pay at the counter to get your official receipt."}</p>
+ <div class="two" style="margin-top:12px"><button class="btn" id="rcprint">Print</button><button class="btn p" id="rcdone">Done</button></div></div>`;
+ document.body.appendChild(ov);const close=()=>ov.remove();$("rcdone").focus();
+ $("rcdone").onclick=close;$("rcprint").onclick=()=>window.print();ov.onclick=e=>{if(e.target===ov)close()};ov.onkeydown=e=>{if(e.key=="Escape")close()}}
 /* reservation receipt */
 function showReceipt(x){const ov=document.createElement("div");ov.className="ov";
  const seats=(TABLES.find(t=>t.no==x.t)||{}).seats,row=(a,b)=>`<div class="row"><span>${a}</span><b>${esc(b)}</b></div>`;
@@ -323,7 +346,7 @@ function card(m){const s=imgSlug(m.n),q=QTY[m.id]||1;
 function vOrder(){
  const cats=["All",...S.tree.children.map(c=>c.name)],q=Q.menu.trim().toLowerCase();
  const list=allItems().filter(m=>(cat=="All"||m.c==cat)&&(!q||m.n.toLowerCase().includes(q)||m.c.toLowerCase().includes(q)));
- const pg=pageOf("menu",list),ids=Object.keys(cart),sum=ids.reduce((a,i)=>a+cart[i].p*cart[i].q,0);
+ const pg={items:list,bar:""},ids=Object.keys(cart),sum=ids.reduce((a,i)=>a+cart[i].p*cart[i].q,0);
  return `<div class="ordgrid"><section class="panel"><h2>Menu</h2>
  <input id="q-menu" class="search" data-q="menu" type="search" placeholder="Search the menu..." value="${esc(Q.menu)}" aria-label="Search the menu">
  <div class="chips">${cats.map(c=>`<button class="btn" aria-pressed="${c==cat}" data-cat="${c}" ${c==cat?'style="border-color:var(--pri)"':""}>${c}</button>`).join("")}</div>
@@ -347,14 +370,14 @@ function vReserve(){
  <label for="rg">Guests ${REQ}</label><input type="number" id="rg" min="1" max="8" value="${rf.guests}">
  <button class="btn p" id="book" style="width:100%;margin-top:12px">Reserve table</button><div class="fmsg" id="fm-book"></div></div></div>`}
 function vActivity(){const po=pageOf("mine",S.orders.slice().reverse()),pr=pageOf("myres",S.res.slice().reverse());
- return `<div class="panel"><h2>My orders</h2>${po.items.length?po.items.map(o=>`<div class="row"><span>#${o.id} · ${tl(o)}<br><small>${o.items.map(i=>esc(i.n)+" ×"+i.q).join(", ")}</small><br><small>${fdt(o.at)}</small></span><span><span class="tag ${o.s}">${o.s}</span></span></div>`).join("")+po.bar:`<p class="empty">No orders yet. Place one from the Order tab.</p>`}</div>
- <div class="panel"><h2>My reservations</h2>${pr.items.length?pr.items.map(x=>`<div class="row"><span><b>R-${String(x.id).padStart(4,"0")}</b> · Table ${x.t} · ${x.guests} guests<br><small>${x.date} at ${fmt(x.time)}</small></span><span><span class="tag ${x.s}">${x.s}</span> <button class="btn" data-rc="${x.id}">Receipt</button></span></div>`).join("")+pr.bar:`<p class="empty">No reservations yet. Book a table from the Reserve tab.</p>`}</div>`}
+ return `<div class="panel"><h2>My orders</h2>${po.items.length?po.items.map(o=>`<div class="row"><span>#${o.id} · ${tl(o)}<br><small>${o.items.map(i=>esc(i.n)+" ×"+i.q).join(", ")}</small><br><small>${fdt(o.at)}</small></span><span><span class="tag ${o.s}">${o.s}</span> ${o.s=="Pending"?`<button class="btn d" data-co="${o.id}">Cancel order</button> `:""}<button class="btn" data-or="${o.id}">Receipt</button></span></div>`).join("")+po.bar:`<p class="empty">No orders yet. Place one from the Order tab.</p>`}<p class="empty" style="margin:8px 0 0">You can cancel an order until the kitchen starts preparing it.</p><div class="fmsg" id="fm-page"></div></div>
+ <div class="panel"><h2>My reservations</h2>${pr.items.length?pr.items.map(x=>`<div class="row"><span><b>R-${String(x.id).padStart(4,"0")}</b> · Table ${x.t} · ${x.guests} guests<br><small>${x.date} at ${fmt(x.time)}</small></span><span><span class="tag ${x.s}">${x.s}</span> ${x.s=="Pending"?`<button class="btn d" data-cr="${x.id}">Cancel reservation</button> `:""}<button class="btn" data-rc="${x.id}">Receipt</button></span></div>`).join("")+pr.bar:`<p class="empty">No reservations yet. Book a table from the Reserve tab.</p>`}<p class="empty" style="margin:8px 0 0">You can cancel a reservation until the staff confirms it.</p><div class="fmsg" id="fm-page-r"></div></div>`}
 function vKitchen(){const q=S.orders.filter(o=>o.s!="Served"),front=q.find(o=>o.s=="Pending"),pg=pageOf("kit",q);
  return `<div class="panel"><h2>Kitchen queue</h2>${pg.items.length?pg.items.map(o=>`<div class="row"><span><b>#${o.id} · ID ${esc(o.cno||"-")} · ${esc(o.name)} · ${tl(o)}</b> <span class="tag ${o.s}">${o.s}</span><br><small>${o.items.map(i=>esc(i.n)+" ×"+i.q).join(", ")}</small>${o.notes?`<br><small><b>Note:</b> ${esc(o.notes)}</small>`:""}<br><small>${fdt(o.at)}</small></span>
  ${o.s=="Pending"&&o!==front?`<span class="empty">Waiting in line</span>`:`<button class="btn p" data-adv="${o.id}">${o.s=="Pending"?"Start next order":"Mark "+FLOW[FLOW.indexOf(o.s)+1]}</button>`}</div>`).join("")+pg.bar:`<p class="empty">The queue is clear.</p>`}<div class="fmsg" id="fm-page"></div></div>`}
 function vRes(){const r=S.res.slice().sort((a,b)=>(a.date+sk(a.time)).localeCompare(b.date+sk(b.time))),pg=pageOf("res",r);
  return `<div class="panel"><h2>Reservations</h2>${S.wait.length?`<div class="msg"><b>Waitlist (${S.wait.length}):</b> ${S.wait.map(w=>esc(w.name)+" ID "+esc(w.cno||"-")+" ("+w.guests+") "+w.date+" "+fmt(w.time)).join("; ")}</div>`:""}${pg.items.length?pg.items.map(x=>`<div class="row"><span><b>${esc(x.name)}</b> (ID ${esc(x.cno||"-")}) · T${x.t} · ${x.guests} guests<br><small>${x.date} at ${fmt(x.time)}</small></span>
- <span><span class="tag ${x.s}">${x.s}</span> ${x.s=="Pending"?`<button class="btn p" data-conf="${x.id}">Confirm</button>`:""}${x.s!="Cancelled"?` <button class="btn d" data-cx="${x.id}">Cancel</button>`:""}</span></div>`).join("")+pg.bar:`<p class="empty">No reservations yet.</p>`}<div class="fmsg" id="fm-page"></div></div>`}
+ <span><span class="tag ${x.s}">${x.s}</span> ${x.s=="Pending"?`<button class="btn p" data-conf="${x.id}">Confirm</button> <button class="btn d" data-cx="${x.id}">Cancel</button>`:""}${x.s=="Confirmed"?`<button class="btn p" data-done="${x.id}">Mark as available</button>`:""}</span></div>`).join("")+pg.bar:`<p class="empty">No reservations yet.</p>`}<div class="fmsg" id="fm-page"></div></div>`}
 function vBill(){
  let b=S.orders.filter(o=>o.s=="Served"||o.s=="Ready"||o.paid);
  const when=o=>o.paidAt||o.at||"",day=o=>when(o).slice(0,10);
@@ -369,17 +392,17 @@ function vBill(){
  <div><label for="bs">Status</label><select id="bs">${opt("All","All",BF.status)}${opt("Paid","Paid",BF.status)}${opt("Unpaid","Not paid",BF.status)}</select></div>
  <div><label for="bo">Sort by</label><select id="bo">${opt("new","Newest first",BF.sort)}${opt("old","Oldest first",BF.sort)}${opt("high","Highest total",BF.sort)}${opt("low","Lowest total",BF.sort)}</select></div></div>
  <p class="empty" style="margin:6px 0 10px">${b.length} transaction(s) · Paid total: <b>${peso(paidSum)}</b> <button class="btn" id="bclear" style="padding:3px 10px;margin-left:6px">Clear filters</button></p>
- ${pg.items.length?pg.items.map(o=>`<div class="row"><span><b>#${o.id}</b> · ID ${esc(o.cno||"-")} · ${tl(o)} · <b>${peso(total(o))}</b><br><small>${o.items.map(i=>esc(i.n)+" ×"+i.q).join(", ")}</small><br><small>Placed: ${fdt(o.at)} · ${o.paid?"Paid: "+fdt(o.paidAt):"Not paid yet"}</small></span>${o.paid?`<span class="tag Served">Paid</span>`:`<button class="btn p" data-pay="${o.id}">Mark paid</button>`}</div>`).join("")+pg.bar:`<p class="empty">No transactions match.</p>${pg.bar}`}<div class="fmsg" id="fm-page"></div></div>`}
-function vMenu(){const q=Q.omenu.trim().toLowerCase(),cats=S.tree.children.map(c=>c.name);
+ ${pg.items.length?pg.items.map(o=>`<div class="row"><span><b>#${o.id}</b> · ID ${esc(o.cno||"-")} · ${tl(o)} · <b>${peso(total(o))}</b><br><small>${o.items.map(i=>esc(i.n)+" ×"+i.q).join(", ")}</small><br><small>Placed: ${fdt(o.at)} · ${o.paid?"Paid: "+fdt(o.paidAt):"Not paid yet"}</small></span><span>${o.paid?`<span class="tag Served">Paid</span>`:`<button class="btn p" data-pay="${o.id}">Mark paid</button>`} <button class="btn" data-or="${o.id}">Receipt</button></span></div>`).join("")+pg.bar:`<p class="empty">No transactions match.</p>${pg.bar}`}<div class="fmsg" id="fm-page"></div></div>`}
+function vMenu(){const own=ME.role=="ADMIN",q=Q.omenu.trim().toLowerCase(),cats=S.tree.children.map(c=>c.name);
  const list=allItems().filter(m=>(Q.ocat=="All"||m.c==Q.ocat)&&(!q||m.n.toLowerCase().includes(q))),pg=pageOf("omenu",list);
- return `<div class="grid"><div class="panel"><h2>Menu items</h2>
+ return `<div class="${own?"grid":""}"><div class="panel"><h2>Menu items</h2><datalist id="catlist">${cats.map(c=>`<option value="${esc(c)}">`).join("")}</datalist>${own?"":`<p class="empty" style="margin:0 0 8px">Staff can edit items and mark them sold out. Only the owner can add or delete items.</p>`}
  <div class="filters"><div><label for="q-omenu">Search</label><input id="q-omenu" data-q="omenu" type="search" placeholder="Search items..." value="${esc(Q.omenu)}"></div>
  <div><label for="oc">Category</label><select id="oc"><option value="All">All categories</option>${cats.map(c=>`<option ${c==Q.ocat?"selected":""}>${esc(c)}</option>`).join("")}</select></div></div>
  ${pg.items.length?pg.items.map(m=>editId==m.id?`<div class="row editrow" data-enter="saveitem"><div style="flex:1 1 150px"><label for="en">Name ${REQ}</label><input id="en" maxlength="40" value="${esc(m.n)}"></div><div style="flex:1 1 130px"><label for="ec">Category ${REQ}</label><input id="ec" list="catlist" maxlength="20" value="${esc(m.c)}"></div><div style="flex:0 0 100px"><label for="ep">Price (₱) ${REQ}</label><input id="ep" type="number" min="1" value="${m.p}"></div>
  <span><button class="btn p" id="saveitem">Save</button> <button class="btn" data-cancel="1">Cancel</button></span></div>`
- :`<div class="row"><span>${esc(m.n)} · <b>${peso(m.p)}</b> <small>(${esc(m.c)})</small></span><span><button class="btn" data-edit="${m.id}">Edit</button> <button class="btn" data-tg="${m.id}">${m.on?"Mark sold out":"Mark available"}</button> <button class="btn d" data-del="${m.id}">Delete</button></span></div>`).join("")+pg.bar:`<p class="empty">No items match.</p>${pg.bar}`}<div class="fmsg" id="fm-page"></div></div>
- <div class="panel" data-enter="addm"><h2>Add item</h2><datalist id="catlist">${cats.map(c=>`<option value="${esc(c)}">`).join("")}</datalist><label for="an">Name ${REQ}</label><input id="an" maxlength="40"><label for="ac">Category ${REQ}</label><input id="ac" list="catlist" value="Meals" maxlength="20"><label for="ap">Price (₱) ${REQ}</label><input id="ap" type="number" min="1">
- <button class="btn p" id="addm" style="width:100%;margin-top:12px">Add to menu</button><div class="fmsg" id="fm-addm"></div></div></div>`}
+ :`<div class="row"><span>${esc(m.n)} · <b>${peso(m.p)}</b> <small>(${esc(m.c)})</small></span><span><button class="btn" data-edit="${m.id}">Edit</button> <button class="btn" data-tg="${m.id}">${m.on?"Mark sold out":"Mark available"}</button> ${own?`<button class="btn d" data-del="${m.id}">Delete</button>`:""}</span></div>`).join("")+pg.bar:`<p class="empty">No items match.</p>${pg.bar}`}<div class="fmsg" id="fm-page"></div></div>
+ ${own?`<div class="panel" data-enter="addm"><h2>Add item</h2><label for="an">Name ${REQ}</label><input id="an" maxlength="40"><label for="ac">Category ${REQ}</label><input id="ac" list="catlist" value="Meals" maxlength="20"><label for="ap">Price (₱) ${REQ}</label><input id="ap" type="number" min="1">
+ <button class="btn p" id="addm" style="width:100%;margin-top:12px">Add to menu</button><div class="fmsg" id="fm-addm"></div></div>`:""}</div>`}
 function vCustomers(){const pg=pageOf("cust",S.customers);
  return `<div class="panel"><h2>Registered customers</h2>${pg.items.length?pg.items.map(x=>`<div class="row"><span><b>${esc(x.name)}</b><br><small>${esc(x.contactNumber)} · ${esc(x.email||"no email")}</small></span><span class="idb">ID ${esc(x.customerNo)}</span></div>`).join("")+pg.bar:`<p class="empty">No customers have signed up yet.</p>`}<div class="fmsg" id="fm-page"></div></div>`}
 function vRep(){const top=REP.top||[],mx=top.length?top[0].qty:1,row=(a,b)=>`<div class="row"><span>${a}</span><b>${b}</b></div>`;
@@ -472,8 +495,12 @@ function bind(){const a=$("app");
   if(d.dec){const c=cart[d.dec],k=d.dec;if(--c.q<=0)delete cart[k];push("Remove "+c.n,()=>{cart[k]=cart[k]||{n:c.n,p:c.p,q:0};cart[k].q++});return draw()}
   if(d.tb){selT=+d.tb;return draw()}
   if(d.adv){const o=S.orders.find(x=>x.id==d.adv);return act(()=>o.s=="Pending"?api("/api/kitchen/start-next","POST"):api("/api/orders/"+o.id+"/advance","POST"))}
-  if(d.pay)return act(()=>api("/api/orders/"+d.pay+"/pay","POST"));
+  if(d.pay)return act(()=>api("/api/orders/"+d.pay+"/pay","POST")).then(()=>{const o=S.orders.find(x=>x.id==d.pay);if(o&&o.paid)showOrderReceipt(o)});
   if(d.conf)return act(()=>api("/api/reservations/"+d.conf+"/confirm","POST"));
+  if(d.co)return confirmBox("Cancel this order?","Order #"+d.co+" will be removed. This only works before the kitchen starts preparing it.","Yes, cancel order","No, keep it",()=>act(()=>api("/api/my/orders/"+d.co+"/cancel","POST"),"Order cancelled.","fm-page"));
+  if(d.cr)return confirmBox("Cancel this reservation?","Your table will be released. This only works before the staff confirms the booking.","Yes, cancel reservation","No, keep it",()=>act(()=>api("/api/my/reservations/"+d.cr+"/cancel","POST"),"Reservation cancelled.","fm-page-r"));
+  if(d.done)return act(()=>api("/api/reservations/"+d.done+"/complete","POST"),"Table is available again.","fm-page");
+  if(d.or){const o=S.orders.find(z=>z.id==d.or);if(o)showOrderReceipt(o);return}
   if(d.cx)return act(()=>api("/api/reservations/"+d.cx+"/cancel","POST"));
   if(d.tg)return act(()=>api("/api/menu/items/"+d.tg+"/toggle","POST"));
   if(d.del)return act(()=>api("/api/menu/items/"+d.del,"DELETE"));
@@ -484,12 +511,12 @@ function bind(){const a=$("app");
   if(id=="place"){
    const prev=cart,items=Object.values(prev).map(c=>({name:c.n,price:c.p,qty:c.q})),tn=OT=="Takeout"?0:selTable,nt=NOTES.trim();
    return act(async()=>{await api("/api/orders?client="+CID,"POST",{tableNo:tn,orderType:OT,notes:nt,items});cart={};NOTES="";
-    push("Place order",async()=>{await api("/api/undo?client="+CID,"POST");cart=prev});tab="Activity"},null,"fm-order")}
+    push("Place order",async()=>{});tab="Activity"},null,"fm-order").then(()=>{if(tab=="Activity")flash("Order placed! You can cancel it here until the kitchen starts preparing it.","fm-page")})}
   if(id=="book"){rf.guests=+$("rg").value;
    if(!selT){flash("Pick an available table first.","fm-book");return}
    let RC=null;
    return act(async()=>{const r=await api("/api/reservations?client="+CID,"POST",{tableNo:selT,date:rf.date,time:rf.time,guests:rf.guests});RC=mapRes(r);
-    push("Reserve table",()=>api("/api/undo?client="+CID,"POST"));selT=null},"Reservation sent. Staff will confirm it shortly.","fm-book").then(()=>{if(RC)showReceipt(RC)})}
+    push("Reserve table",()=>api("/api/undo?client="+CID,"POST"));selT=null},"Reservation sent. Staff will confirm it shortly. You can cancel it in the Activity tab until then.","fm-book").then(()=>{if(RC)showReceipt(RC)})}
   if(id=="addm")return act(()=>api("/api/menu/items","POST",{name:$("an").value.trim(),category:$("ac").value.trim(),price:+$("ap").value}),"Item added.","fm-addm")};
  a.onkeydown=e=>{if(e.key!="Enter"||e.target.tagName!="INPUT")return;const z=e.target.closest("[data-enter]");if(z){e.preventDefault();const b=$(z.dataset.enter);if(b)b.click()}};
  a.oninput=e=>{const t=e.target;

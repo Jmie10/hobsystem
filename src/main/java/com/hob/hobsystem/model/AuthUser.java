@@ -29,10 +29,10 @@ public abstract class AuthUser {
     }
     protected static boolean ownerOnly(String method, String path) {
         return path.startsWith("/api/reports") || path.startsWith("/api/customers")
-            || (path.startsWith("/api/menu") && !method.equals("GET"));
+            || (path.startsWith("/api/menu") && (method.equals("DELETE") || path.equals("/api/menu/items")));   // staff may edit and toggle; only the owner adds or deletes
     }
     protected static boolean customerAction(String method, String path) {
         return !method.equals("GET") && (path.equals("/api/orders") || path.equals("/api/reservations")
-            || path.equals("/api/waitlist") || path.equals("/api/undo"));
+            || path.equals("/api/waitlist") || path.equals("/api/undo") || path.startsWith("/api/my/"));
     }
 }

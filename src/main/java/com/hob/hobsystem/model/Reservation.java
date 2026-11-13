@@ -10,7 +10,7 @@ public class Reservation extends BaseEntity {
     private String bookingDate;   // yyyy-MM-dd
     private String bookingTime;   // HH:mm
     private int guests;
-    private String status = "Pending";   // Pending, Confirmed, Cancelled
+    private String status = "Pending";   // Pending, Confirmed, Completed, Cancelled
     private Long customerId;
     private String customerNo;
 
