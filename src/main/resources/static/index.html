@@ -140,6 +140,8 @@ textarea{resize:none;font:inherit}
 .olist .row .nm{flex:1;min-width:0}
 .ofoot{flex:none;border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
 .ofoot .row{border:0}.tot{font-size:22px}
+.chk{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-weight:500;cursor:pointer}.chk input{width:18px;height:18px;margin:0;accent-color:var(--pri)}.rsv{margin-top:4px}.rsv label{margin-top:8px}
+.ordpanel{overflow-y:auto}.ordpanel>*{flex-shrink:0}.ordpanel .olist{flex:none;min-height:90px;max-height:200px}.ordpanel .ofoot{position:sticky;bottom:0;background:var(--card);margin-top:auto}
 .ordpanel .cid{margin:0 0 6px;font-size:13px;color:var(--mute)}
 /* ---- login page: photo on the left, form on the right ---- */
 .authpage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);min-height:100vh;min-height:100dvh}
@@ -196,9 +198,14 @@ const ROLE={CUSTOMER:"Customer",STAFF:"Staff",ADMIN:"Admin"};
 try{TOKEN=localStorage.getItem("hobtoken");lockUntil=+localStorage.getItem("hoblock")||0}catch(e){}
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const peso=n=>"₱"+Number(n).toLocaleString();
-const today=()=>new Date().toISOString().slice(0,10);
+/* All times follow Philippine time (Asia/Manila), whatever the device clock says. */
+const phParts=()=>new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Manila",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",hourCycle:"h23"}).formatToParts(new Date()).reduce((o,x)=>(o[x.type]=x.value,o),{});
+const today=()=>{const p=phParts();return p.year+"-"+p.month+"-"+p.day};
+/* a slot is over one hour after it starts; times before 6 AM belong to the night of the date picked */
+const slotPast=(d,t)=>{const p=phParts(),now=Date.UTC(+p.year,+p.month-1,+p.day,+p.hour,+p.minute),[y,mo,da]=d.split("-").map(Number),h=+t.split(":")[0];return Date.UTC(y,mo-1,da+(h<6?1:0),h,0)+3600000<=now};
+const firstSlot=d=>SLOTS.find(t=>!slotPast(d,t))||SLOTS[0];
 const $=id=>document.getElementById(id);
-let role="Customer",tab="Order",cat="All",cart={},selT=null,rf={date:today(),time:"18:00",guests:2};
+let role="Customer",tab="Order",cat="All",cart={},selT=null,rf={date:today(),time:"18:00",guests:2};rf.time=firstSlot(rf.date);
 const PG={},BF={from:"",to:"",status:"All",sort:"new"},Q={menu:"",omenu:"",ocat:"All"};
 const TABS={Customer:["Order","Reserve","Activity"],Staff:["Kitchen","Reservations","Billing","Menu"],Admin:["Menu","Billing","Customers","Reports"]};
 const REQ='<span class="req" aria-hidden="true">*</span>';
@@ -233,7 +240,7 @@ async function act(fn,ok,where){try{await fn();await load();draw();if(ok)flash(o
 const allItems=()=>S.tree.children.flatMap(c=>c.items.map(i=>({...i,c:c.name})));
 const push=(label,fn)=>{U.push({label,fn});if(U.length>20)U.shift()};
 const total=o=>o.items.reduce((a,i)=>a+i.p*i.q,0);
-const fdt=s=>{if(!s)return "-";const d=new Date(s);return isNaN(d)?"-":d.toLocaleString("en-PH",{dateStyle:"medium",timeStyle:"short"})};
+const fdt=s=>{if(!s)return "-";const m=String(s).match(/^(\d{4})-(\d\d)-(\d\d)[T ](\d\d):(\d\d)/);if(!m)return "-";const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]));return d.toLocaleString("en-PH",{dateStyle:"medium",timeStyle:"short",timeZone:"UTC"})};
 /* 10 items per page, with arrows at the bottom */
 function pageOf(key,list){const n=Math.max(1,Math.ceil(list.length/PER)),p=Math.min(Math.max(PG[key]||1,1),n);PG[key]=p;
  return{items:list.slice((p-1)*PER,p*PER),bar:`<div class="pager"><button class="btn" data-pg="${key}" data-to="${p-1}" ${p<=1?"disabled":""} aria-label="Previous page">&#8249;</button><span>Page ${p} of ${n}</span><button class="btn" data-pg="${key}" data-to="${p+1}" ${p>=n?"disabled":""} aria-label="Next page">&#8250;</button></div>`}}
@@ -330,7 +337,7 @@ function showReceipt(x){const ov=document.createElement("div");ov.className="ov"
  $("rcdone").onclick=close;$("rcprint").onclick=()=>window.print();ov.onclick=e=>{if(e.target===ov)close()};ov.onkeydown=e=>{if(e.key=="Escape")close()}}
 
 /* ---------- views ---------- */
-const FLAVORS=["Cheese","Sour Cream","BBQ"],QTY={},FL={};let OT="Dine-in",NOTES="",selTable=1;
+const FLAVORS=["Cheese","Sour Cream","BBQ"],QTY={},FL={};let OT="Dine-in",NOTES="",selTable=1,ORS=false;
 const HAS=new Set(["americano","beef-tapa","black-forest","blueberry-milk","blueberry-soda","caramel-macchiato","cheese-stick","chicken","choco-milk","dark-mocha","dirty-matcha","flavored-fries","fries-overload","green-apple-soda","hob","hungarian","latte","liempo","longganisa","lychee-soda","matcha","mixed-berries","nachos","onion-rings","porkchop","salted-caramel-latte","shanghai","spam-silog","spanish-latte","strawberry-matcha","strawberry-milk","strawberry-soda","taro","tocino","tonkatsu","vanilla-latte","vietnamese","white-mocha"]);
 const DESC={"flavored fries":"Crispy fries tossed in your choice of flavor: cheese, sour cream or BBQ.","fries overload":"Fries loaded with savory beef, fresh toppings and a creamy drizzle.","nachos overload":"Crunchy nachos piled with savory beef, fresh toppings and a creamy drizzle.","cheese sticks":"Golden breaded cheese sticks served with a tangy dipping sauce.","onion rings":"Crispy battered onion rings served with a creamy dip.",
  "beef tapa":"Tender marinated beef tapa with garlic rice and a fried egg.","longganisa":"Sweet and savory longganisa with garlic rice and a fried egg.","porkchop":"Pan-fried porkchop with garlic rice and a fried egg.","liempo":"Grilled pork belly (liempo) with garlic rice and a fried egg.","shanghai":"Crispy fried lumpiang Shanghai with garlic rice and a fried egg.","hungarian":"Smoky Hungarian sausage with garlic rice and a fried egg.","chicken":"Crispy fried chicken with garlic rice and a fried egg.","tocino":"Sweet cured pork tocino with garlic rice and a fried egg.","tonkatsu":"Breaded, deep-fried pork cutlet with garlic rice and a fried egg.","spam silog":"Pan-seared Spam with garlic rice and a fried egg.",
@@ -346,6 +353,14 @@ function card(m){const s=imgSlug(m.n),q=QTY[m.id]||1;
  <div class="bd"><b>${esc(m.n)}</b><span class="ds">${esc(dsc(m))}</span>
  ${isFlav(m)&&m.on?`<label class="fl">Flavor<select data-fl="${m.id}" aria-label="Fries flavor">${FLAVORS.map(f=>`<option ${f==(FL[m.id]||FLAVORS[0])?"selected":""}>${f}</option>`).join("")}</select></label>`:""}
  <div class="buy"><span class="price">${peso(m.p)}</span>${m.on?`<span class="step"><button data-qs="${m.id}:-1" aria-label="Less">&minus;</button><span>${q}</span><button data-qs="${m.id}:1" aria-label="More">+</button></span><button class="btn p" data-add="${m.id}">Add to order</button>`:`<span class="empty">Sold out today</span>`}</div></div></div>`}
+function rsvBlock(){
+ const av=TABLES.filter(T=>T.status=="Available"&&T.seats>=rf.guests);
+ if(!av.some(T=>T.no==selT))selT=av.length?av[0].no:null;
+ return `<div class="rsv"><div class="two dt"><div><label for="rd">Date</label><input type="date" id="rd" min="${today()}" value="${rf.date}"></div>
+ <div><label for="rt">Time</label><select id="rt">${SLOTS.map(s=>`<option value="${s}" ${s==rf.time?"selected":""} ${slotPast(rf.date,s)?"disabled":""}>${fmt(s)}</option>`).join("")}</select></div></div>
+ <div class="two dt"><div><label for="rg">Guests</label><input type="number" id="rg" min="1" max="8" value="${rf.guests}"></div>
+ <div><label for="rtb">Table</label><select id="rtb" ${av.length?"":"disabled"}>${av.length?av.map(T=>`<option value="${T.no}" ${T.no==selT?"selected":""}>Table ${T.no} (${T.seats} seats)</option>`).join(""):`<option>None free</option>`}</select></div></div>
+ <p class="empty" style="margin:6px 0 0">Open 6:00 PM to 3:00 AM (Philippine time). Staff will confirm this table.</p></div>`}
 function vOrder(){
  const cats=["All",...S.tree.children.map(c=>c.name)],q=Q.menu.trim().toLowerCase();
  const list=allItems().filter(m=>(cat=="All"||m.c==cat)&&(!q||m.n.toLowerCase().includes(q)||m.c.toLowerCase().includes(q)));
@@ -356,7 +371,9 @@ function vOrder(){
  <div class="scroll">${pg.items.length?`<div class="menu">${pg.items.map(card).join("")}</div>`:`<p class="empty">No items match your search.</p>`}</div>${pg.bar}</section>
  <section class="panel ordpanel"><h2>Your order</h2><p class="cid">Customer ID: <b>${esc(ME.customerNo)}</b></p>
  <div class="seg" role="group" aria-label="Order type"><button data-ot="Dine-in" aria-pressed="${OT=="Dine-in"}">Dine-in</button><button data-ot="Takeout" aria-pressed="${OT=="Takeout"}">Takeout</button></div>
- ${OT=="Dine-in"?`<label for="ct">Table selector</label><select id="ct">${TABLES.map(t=>`<option value="${t.no}" ${t.no==selTable?"selected":""}>Table ${t.no} (${t.seats} seats)</option>`).join("")}</select>`:`<p class="empty" style="margin:10px 0 0">Takeout needs no table. Pick up your order at the counter.</p>`}
+ ${OT=="Dine-in"?`<label class="chk"><input type="checkbox" id="ors" ${ORS?"checked":""}> Also reserve a table for later</label>`:""}
+ ${OT=="Dine-in"&&ORS?rsvBlock():""}
+ ${OT=="Dine-in"?(ORS?"":`<label for="ct">Table selector</label><select id="ct">${TABLES.map(t=>`<option value="${t.no}" ${t.no==selTable?"selected":""}>Table ${t.no} (${t.seats} seats)</option>`).join("")}</select>`):`<p class="empty" style="margin:10px 0 0">Takeout needs no table. Pick up your order at the counter.</p>`}
  <label for="onotes">Special instructions / notes</label><textarea id="onotes" rows="2" maxlength="300" placeholder="Special instructions...">${esc(NOTES)}</textarea>
  <div class="scroll olist">${ids.length?ids.map(i=>`<div class="row"><span class="nm">${esc(cart[i].n)} × ${cart[i].q}</span><span><b>${peso(cart[i].p*cart[i].q)}</b> <button class="btn" data-dec="${i}" aria-label="Remove one">−</button></span></div>`).join(""):`<p class="empty">Nothing yet. Add a dish from the menu.</p>`}</div>
  <div class="ofoot"><div class="row"><b>Total</b><b class="tot">${peso(sum)}</b></div>
@@ -364,7 +381,7 @@ function vOrder(){
 function vReserve(){
  return `<div class="grid"><div class="panel"><h2>Pick a table</h2>
  <div class="two dt"><div><label for="rd">Date</label><input type="date" id="rd" min="${today()}" value="${rf.date}"></div>
- <div><label for="rt">Time</label><select id="rt">${SLOTS.map(s=>`<option value="${s}" ${s==rf.time?"selected":""}>${fmt(s)}</option>`).join("")}</select></div></div>
+ <div><label for="rt">Time</label><select id="rt">${SLOTS.map(s=>`<option value="${s}" ${s==rf.time?"selected":""} ${slotPast(rf.date,s)?"disabled":""}>${fmt(s)}</option>`).join("")}</select></div></div>
  <p class="empty" style="margin:8px 0 0">Open 6:00 PM to 3:00 AM. Times after midnight count under the date you picked.</p>
  <div class="tables">${TABLES.map(T=>{const t=T.no,tk=T.status=="Reserved";return `<button class="tbl ${tk?"taken":""} ${selT==t?"sel":""}" data-tb="${t}" ${tk?"disabled":""} aria-label="Table ${t}, ${T.seats} seats, ${T.status}">T${t}<small>${T.seats} seats${tk?"<br>taken":""}</small></button>`}).join("")}</div>
  ${TABLES.some(T=>T.status=="Available"&&T.seats>=rf.guests)?"":`<div class="msg">No free table fits ${rf.guests} guests at this time. <button class="btn p" data-wl="1">Join waitlist</button></div>`}
@@ -512,9 +529,16 @@ function bind(){const a=$("app");
   if(id=="saveitem")return act(async()=>{await api("/api/menu/items/"+editId+"/update","POST",{name:$("en").value.trim(),category:$("ec").value.trim(),price:+$("ep").value});editId=null},"Item updated.");
   if(id=="bclear"){BF.from="";BF.to="";BF.status="All";BF.sort="new";PG.bill=1;return draw()}
   if(id=="place"){
-   const prev=cart,items=Object.values(prev).map(c=>({name:c.n,price:c.p,qty:c.q})),tn=OT=="Takeout"?0:selTable,nt=NOTES.trim();
-   return act(async()=>{await api("/api/orders?client="+CID,"POST",{tableNo:tn,orderType:OT,notes:nt,items});cart={};NOTES="";
-    push("Place order",async()=>{});tab="Activity"},null,"fm-order").then(()=>{if(tab=="Activity")flash("Order placed! You can cancel it here until the kitchen starts preparing it.","fm-page")})}
+   const prev=cart,items=Object.values(prev).map(c=>({name:c.n,price:c.p,qty:c.q})),rs=OT=="Dine-in"&&ORS,tn=OT=="Takeout"?0:(rs?selT:selTable),nt=NOTES.trim();
+   if(rs&&!selT){flash("No free table for that date, time and party size. Try another time.","fm-order");return}
+   if(rs&&slotPast(rf.date,rf.time)){flash("That time has already passed. Pick a later time.","fm-order");return}
+   let RM="";
+   return act(async()=>{
+    if(rs){const r=await api("/api/reservations?client="+CID,"POST",{tableNo:selT,date:rf.date,time:rf.time,guests:rf.guests});
+     try{await api("/api/orders?client="+CID,"POST",{tableNo:tn,orderType:OT,notes:nt,items})}catch(e){try{await api("/api/my/reservations/"+r.id+"/cancel","POST")}catch(x){}throw e}
+     RM=" Table "+selT+" is reserved for "+rf.date+" at "+fmt(rf.time)+". Staff will confirm it.";ORS=false;selT=null}
+    else await api("/api/orders?client="+CID,"POST",{tableNo:tn,orderType:OT,notes:nt,items});
+    cart={};NOTES="";push("Place order",async()=>{});tab="Activity"},null,"fm-order").then(()=>{if(tab=="Activity")flash("Order placed!"+RM+" You can cancel it here until the kitchen starts preparing it.","fm-page")})}
   if(id=="book"){rf.guests=+$("rg").value;
    if(!selT){flash("Pick an available table first.","fm-book");return}
    let RC=null;
@@ -531,6 +555,8 @@ function bind(){const a=$("app");
   if(t.dataset.q){const k=t.dataset.q,pos=t.selectionStart;Q[k]=t.value;PG[k]=1;draw();const n=$(t.id);if(n){n.focus();try{n.setSelectionRange(pos,pos)}catch(x){}}}};
  a.onchange=e=>{const i=e.target.id,v=e.target.value;
   if(i=="ct")selTable=+v;
+  if(i=="rtb")selT=+v;
+  if(i=="ors"){ORS=e.target.checked;selT=null;return act(async()=>{},null,"fm-order")}
   if(e.target.dataset.fl)FL[e.target.dataset.fl]=v;
   if(i=="rg"){rf.guests=+v;selT=null;draw()}
   if(i=="rd"){rf.date=v;selT=null;act(async()=>{},null,"fm-book")}

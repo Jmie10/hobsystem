@@ -10,6 +10,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
 import java.util.*;
 
 @Service
@@ -63,6 +67,7 @@ public class ReservationService {
         if (tableNo < 1 || tableNo > TABLE_COUNT) throw bad("Pick an available table first.");
         if (date == null || date.isBlank() || time == null || time.isBlank()) throw bad("Choose a date and time.");
         if (!OPEN_SLOTS.contains(time)) throw bad("House of Brew is open 6:00 PM to 3:00 AM. Pick a time in that range.");
+        requireNotPast(date, time);
         if (guests < 1 || guests > SEATS[tableNo - 1])
             throw bad("Table " + tableNo + " seats " + SEATS[tableNo - 1] + ". Choose a larger table.");
         if (personKeys.contains(personKey(u.getCustomerNo(), date, time)))
@@ -74,6 +79,18 @@ public class ReservationService {
         Reservation r = repo.save(nr);
         index(r);
         return r;
+    }
+
+    /** A slot is over one hour after it starts (Philippine time). Times before 6 AM belong to the night of the chosen date. */
+    private void requireNotPast(String date, String time) {
+        try {
+            int hour = Integer.parseInt(time.substring(0, 2));
+            LocalDateTime start = LocalDate.parse(date).plusDays(hour < 6 ? 1 : 0).atTime(hour, 0);
+            if (start.plusHours(1).isBefore(LocalDateTime.now(ZoneId.of("Asia/Manila"))))
+                throw bad("That time has already passed. Pick a later time.");
+        } catch (DateTimeParseException | NumberFormatException e) {
+            throw bad("Choose a valid date and time.");
+        }
     }
 
     public synchronized Reservation confirm(Long id) {
