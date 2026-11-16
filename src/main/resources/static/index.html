@@ -475,9 +475,11 @@ function tick(){clearInterval(lockTimer);lockTimer=setInterval(()=>{const left=M
  const t=$("lockt");if(t)t.textContent=Math.floor(left/60)+":"+String(left%60).padStart(2,"0")},1000)}
 function startLock(sec,msg){lockUntil=Date.now()+sec*1000;try{localStorage.setItem("hoblock",lockUntil)}catch(e){}authTab="login";draw();tick();flash(msg,"fm-login")}
 async function doAuth(path,body){const where=path.endsWith("signup")?"fm-signup":"fm-login";
- try{const s=await api(path,"POST",body);TOKEN=s.token;ME=s.user;try{localStorage.setItem("hobtoken",TOKEN);localStorage.removeItem("hoblock")}catch(e){}
- lockUntil=0;role=ROLE[ME.role];tab=TABS[role][0];ddOpen=false;await load();draw();
- if(path.endsWith("signup"))notice("Account created","Your Customer ID is "+ME.customerNo+". Show it to the staff when you order or reserve.")}
+ try{const s=await api(path,"POST",body);
+ if(path.endsWith("signup")){const no=s.user.customerNo;TOKEN=s.token;try{await api("/api/auth/logout","POST")}catch(x){}TOKEN=null;ME=null;authTab="login";draw();
+  if($("li"))$("li").value=no;if($("lp"))$("lp").focus();flash("Account created! Your Customer ID is "+no+". Log in to continue.","fm-login");return}
+ TOKEN=s.token;ME=s.user;try{localStorage.setItem("hobtoken",TOKEN);localStorage.removeItem("hoblock")}catch(e){}
+ lockUntil=0;role=ROLE[ME.role];tab=TABS[role][0];ddOpen=false;await load();draw();}
  catch(e){if(e.retryAfter)startLock(e.retryAfter,e.message);else flash(e.message,where)}}
 function doSignup(){const f=$("sf").value.trim(),m=$("sm").value.trim(),l=$("sl").value.trim(),e=$("se").value.trim(),c=$("sc").value.trim(),p=$("sp").value,W="fm-signup";
  if(!f||!l){flash("Enter your first name and last name.",W);return}
