@@ -142,6 +142,9 @@ textarea{resize:none;font:inherit}
 .ofoot .row{border:0}.tot{font-size:22px}
 .chk{display:flex;align-items:center;gap:8px;margin:12px 0 4px;font-weight:500;cursor:pointer}.chk input{width:18px;height:18px;margin:0;accent-color:var(--pri)}.rsv{margin-top:4px}.rsv label{margin-top:8px}
 .ordpanel{overflow-y:auto}.ordpanel>*{flex-shrink:0}.ordpanel .olist{flex:none;min-height:90px;max-height:200px}.ordpanel .ofoot{position:sticky;bottom:0;background:var(--card);margin-top:auto}
+#toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:60;max-width:90vw;text-align:center}#toast.on{opacity:1;transform:translateX(-50%)}
+.cartbar{display:none}
+@media(max-width:940px){.cartbar{display:block;position:fixed;left:12px;right:12px;bottom:12px;z-index:50;height:48px;border-radius:12px;background:var(--pri);color:#fff;font:600 15px inherit;font-family:inherit;border:0;box-shadow:0 6px 18px rgba(0,0,0,.25)}}
 .ordpanel .cid{margin:0 0 6px;font-size:13px;color:var(--mute)}
 /* ---- login page: photo on the left, form on the right ---- */
 .authpage{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);min-height:100vh;min-height:100dvh}
@@ -242,6 +245,7 @@ const push=(label,fn)=>{U.push({label,fn});if(U.length>20)U.shift()};
 const total=o=>o.items.reduce((a,i)=>a+i.p*i.q,0);
 const fdt=s=>{if(!s)return "-";const m=String(s).match(/^(\d{4})-(\d\d)-(\d\d)[T ](\d\d):(\d\d)/);if(!m)return "-";const d=new Date(Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]));return d.toLocaleString("en-PH",{dateStyle:"medium",timeStyle:"short",timeZone:"UTC"})};
 /* 10 items per page, with arrows at the bottom */
+function toast(m){let t=document.getElementById("toast");if(!t){t=document.createElement("div");t.id="toast";t.setAttribute("role","status");document.body.appendChild(t)}t.textContent=m;t.className="on";clearTimeout(toast.h);toast.h=setTimeout(()=>t.className="",1800)}
 function pageOf(key,list){const n=Math.max(1,Math.ceil(list.length/PER)),p=Math.min(Math.max(PG[key]||1,1),n);PG[key]=p;
  return{items:list.slice((p-1)*PER,p*PER),bar:`<div class="pager"><button class="btn" data-pg="${key}" data-to="${p-1}" ${p<=1?"disabled":""} aria-label="Previous page">&#8249;</button><span>Page ${p} of ${n}</span><button class="btn" data-pg="${key}" data-to="${p+1}" ${p>=n?"disabled":""} aria-label="Next page">&#8250;</button></div>`}}
 /* password strength: 0 weak (not allowed), 1 medium, 2 strong */
@@ -270,15 +274,18 @@ let SK="",SPOS=[];
 function draw(){
  const k=tab+"|"+cat+"|"+(PG.menu||1)+"|"+Q.menu+"|"+!!ME;
  SPOS=[...document.querySelectorAll(".view,.scroll")].map(e=>e.scrollTop);
+ const WY=window.scrollY;
  document.body.classList.toggle("auth",!ME);
  if(!ME){$("app").innerHTML=vAuth();bind();return}
  TABLES.forEach(t=>{const x=TB.find(z=>z.no==t.no);t.status=x?x.status:"Available"});
  const un="";
  const nav=`<nav class="side" aria-label="Main menu"><span class="lg"><img src="${LOGO}" alt="House of Brew logo"></span>${TABS[role].map(t=>`<button class="nav" aria-pressed="${t==tab}" data-t="${t}">${NAVI[t]}<span>${t}</span></button>`).join("")}</nav>`;
+ const cn=Object.values(cart).reduce((a,c)=>a+c.q,0),ct=Object.values(cart).reduce((a,c)=>a+c.q*c.p,0);
  const v={Order:vOrder,Reserve:vReserve,Activity:vActivity,Kitchen:vKitchen,Reservations:vRes,Billing:vBill,Menu:vMenu,Reports:vRep,Customers:vCustomers,Account:vAccount}[tab]();
- $("app").innerHTML=`<div class="shell">${nav}<div class="content"><div class="topbar"><h1>Orders and Reservations</h1><div class="who" id="roles"></div></div>${un}<div class="view ${tab=="Order"?"fit":""}">${v}</div></div></div>`;
+ $("app").innerHTML=`<div class="shell">${nav}<div class="content"><div class="topbar"><h1>Orders and Reservations</h1><div class="who" id="roles"></div></div>${un}<div class="view ${tab=="Order"?"fit":""}">${v}</div></div></div>${tab=="Order"&&cn?`<button class="cartbar" id="gocart">View your order &middot; ${cn} item${cn>1?"s":""} &middot; ${peso(ct)}</button>`:""}`;
  head();
  if(SK==k)document.querySelectorAll(".view,.scroll").forEach((e,i)=>{if(SPOS[i])e.scrollTop=SPOS[i]});
+ if(SK==k&&WY)window.scrollTo(0,WY);
  SK=k;
  $("app").querySelector(".side").onclick=e=>{const b=e.target.closest("[data-t]");if(b){tab=b.dataset.t;draw()}};
  bind()}
@@ -515,7 +522,8 @@ function bind(){const a=$("app");
   if(d.qs){const[i,dl]=d.qs.split(":");QTY[i]=Math.min(20,Math.max(1,(QTY[i]||1)+ +dl));return draw()}
   if(d.ot){OT=d.ot;return draw()}
   if(d.add){const m=allItems().find(x=>x.id==d.add),fl=isFlav(m)?(FL[m.id]||FLAVORS[0]):"",k=fl?m.id+"|"+fl:String(m.id),q=QTY[m.id]||1,nm=fl?m.n+" ("+fl+")":m.n;
-   cart[k]=cart[k]||{n:nm,p:m.p,q:0};cart[k].q+=q;QTY[m.id]=1;push("Add "+nm,()=>{if(cart[k]&&(cart[k].q-=q)<=0)delete cart[k]});return draw()}
+   cart[k]=cart[k]||{n:nm,p:m.p,q:0};cart[k].q+=q;QTY[m.id]=1;push("Add "+nm,()=>{if(cart[k]&&(cart[k].q-=q)<=0)delete cart[k]});draw();toast("Added "+nm+" to your order");return}
+  if(id=="gocart"){const o=document.querySelector(".ordpanel");if(o)window.scrollTo(0,o.getBoundingClientRect().top+window.scrollY-12);return}
   if(d.dec){const c=cart[d.dec],k=d.dec;if(--c.q<=0)delete cart[k];push("Remove "+c.n,()=>{cart[k]=cart[k]||{n:c.n,p:c.p,q:0};cart[k].q++});return draw()}
   if(d.tb){selT=+d.tb;return draw()}
   if(d.adv){const o=S.orders.find(x=>x.id==d.adv);return act(()=>o.s=="Pending"?api("/api/kitchen/start-next","POST"):api("/api/orders/"+o.id+"/advance","POST"))}
