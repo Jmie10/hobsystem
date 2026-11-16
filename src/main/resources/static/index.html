@@ -395,8 +395,10 @@ function vActivity(){const po=pageOf("mine",S.orders.slice().reverse()),pr=pageO
 function vKitchen(){const q=S.orders.filter(o=>o.s!="Served"),front=q.find(o=>o.s=="Pending"),pg=pageOf("kit",q);
  return `<div class="panel"><h2>Kitchen queue</h2>${pg.items.length?pg.items.map(o=>`<div class="row"><span><b>#${o.id} · ID ${esc(o.cno||"-")} · ${esc(o.name)} · ${tl(o)}</b> <span class="tag ${o.s}">${o.s}</span><br><small>${o.items.map(i=>esc(i.n)+" ×"+i.q).join(", ")}</small>${o.notes?`<br><small><b>Note:</b> ${esc(o.notes)}</small>`:""}<br><small>${fdt(o.at)}</small></span>
  ${o.s=="Pending"&&o!==front?`<span class="empty">Waiting in line</span>`:`<button class="btn p" data-adv="${o.id}">${o.s=="Pending"?"Start next order":"Mark "+FLOW[FLOW.indexOf(o.s)+1]}</button>`}</div>`).join("")+pg.bar:`<p class="empty">The queue is clear.</p>`}<div class="fmsg" id="fm-page"></div></div>`}
-function vRes(){const r=S.res.slice().sort((a,b)=>(a.date+sk(a.time)).localeCompare(b.date+sk(b.time))),pg=pageOf("res",r);
- return `<div class="panel"><h2>Reservations</h2>${S.wait.length?`<div class="msg"><b>Waitlist (${S.wait.length}):</b> ${S.wait.map(w=>esc(w.name)+" ID "+esc(w.cno||"-")+" ("+w.guests+") "+w.date+" "+fmt(w.time)).join("; ")}</div>`:""}${pg.items.length?pg.items.map(x=>`<div class="row"><span><b>${esc(x.name)}</b> (ID ${esc(x.cno||"-")}) · T${x.t} · ${x.guests} guests<br><small>${x.date} at ${fmt(x.time)}</small></span>
+let RS="soon";
+const RSORT={soon:(a,b)=>(a.date+sk(a.time)).localeCompare(b.date+sk(b.time)),late:(a,b)=>(b.date+sk(b.time)).localeCompare(a.date+sk(a.time)),new:(a,b)=>b.id-a.id,old:(a,b)=>a.id-b.id};
+function vRes(){const r=S.res.slice().sort(RSORT[RS]||RSORT.soon),pg=pageOf("res",r);
+ return `<div class="panel"><h2>Reservations</h2><label for="rso">Sort by</label><select id="rso"><option value="soon" ${RS=="soon"?"selected":""}>Reservation date: earliest first</option><option value="late" ${RS=="late"?"selected":""}>Reservation date: latest first</option><option value="new" ${RS=="new"?"selected":""}>Booked: newest first</option><option value="old" ${RS=="old"?"selected":""}>Booked: oldest first</option></select>${S.wait.length?`<div class="msg"><b>Waitlist (${S.wait.length}):</b> ${S.wait.map(w=>esc(w.name)+" ID "+esc(w.cno||"-")+" ("+w.guests+") "+w.date+" "+fmt(w.time)).join("; ")}</div>`:""}${pg.items.length?pg.items.map(x=>`<div class="row"><span><b>${esc(x.name)}</b> (ID ${esc(x.cno||"-")}) · T${x.t} · ${x.guests} guests<br><small>${x.date} at ${fmt(x.time)}</small></span>
  <span><span class="tag ${x.s}">${x.s}</span> ${x.s=="Pending"?`<button class="btn p" data-conf="${x.id}">Confirm</button> <button class="btn d" data-cx="${x.id}">Cancel</button>`:""}${x.s=="Confirmed"?`<button class="btn p" data-done="${x.id}">Mark as available</button>`:""}</span></div>`).join("")+pg.bar:`<p class="empty">No reservations yet.</p>`}<div class="fmsg" id="fm-page"></div></div>`}
 function vBill(){
  let b=S.orders.filter(o=>o.s=="Served"||o.s=="Ready"||o.paid);
@@ -564,6 +566,7 @@ function bind(){const a=$("app");
   if(i=="bf"){BF.from=v;PG.bill=1;draw()}
   if(i=="bt"){BF.to=v;PG.bill=1;draw()}
   if(i=="bs"){BF.status=v;PG.bill=1;draw()}
+  if(i=="rso"){RS=v;PG.res=1;draw()}
   if(i=="bo"){BF.sort=v;PG.bill=1;draw()}
   if(i=="oc"){Q.ocat=v;PG.omenu=1;draw()}}}
 
