@@ -136,6 +136,7 @@ body:not(.auth){overflow:hidden}
 .fl select{width:auto;flex:1;padding:5px 8px}
 .seg{margin-top:4px}.seg button{flex:1}
 textarea{resize:none;font:inherit}
+.goes{margin-top:10px;font-size:13px}.goes .chips{margin-top:6px}
 .olist{margin-top:10px;border-top:1px solid var(--line)}
 .olist .row .nm{flex:1;min-width:0}
 .ofoot{flex:none;border-top:1px solid var(--line);padding-top:8px;margin-top:8px}
@@ -144,6 +145,7 @@ textarea{resize:none;font:inherit}
 .ordpanel{overflow-y:auto}.ordpanel>*{flex-shrink:0}.ordpanel .olist{flex:none;min-height:90px;max-height:200px}.ordpanel .ofoot{position:sticky;bottom:0;background:var(--card);margin-top:auto}
 #toast{position:fixed;left:50%;bottom:78px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-size:14px;opacity:0;pointer-events:none;transition:.2s;z-index:60;max-width:90vw;text-align:center}#toast.on{opacity:1;transform:translateX(-50%)}
 .cartbar{display:none}
+@media(max-width:940px){.content{padding-bottom:84px}}
 @media(max-width:940px){.cartbar{display:block;position:fixed;left:12px;right:12px;bottom:12px;z-index:50;height:48px;border-radius:12px;background:var(--pri);color:#fff;font:600 15px inherit;font-family:inherit;border:0;box-shadow:0 6px 18px rgba(0,0,0,.25)}}
 .ordpanel .cid{margin:0 0 6px;font-size:13px;color:var(--mute)}
 /* ---- login page: photo on the left, form on the right ---- */
@@ -288,7 +290,8 @@ function draw(){
  if(SK==k&&WY)window.scrollTo(0,WY);
  SK=k;
  $("app").querySelector(".side").onclick=e=>{const b=e.target.closest("[data-t]");if(b){tab=b.dataset.t;draw()}};
- bind()}
+
+ bind();if(tab=="Order"&&ME)loadRec()}
 /* ---------- small helpers ---------- */
 const fmt=t=>{const[h,m]=t.split(":").map(Number);return (h%12||12)+":"+String(m).padStart(2,"0")+(h<12?" AM":" PM")};
 const sk=t=>(t<"06:00"?"2":"1")+t;   // times after midnight sort after the evening ones
@@ -349,6 +352,10 @@ const HAS=new Set(["americano","beef-tapa","black-forest","blueberry-milk","blue
 const DESC={"flavored fries":"Crispy fries tossed in your choice of flavor: cheese, sour cream or BBQ.","fries overload":"Fries loaded with savory beef, fresh toppings and a creamy drizzle.","nachos overload":"Crunchy nachos piled with savory beef, fresh toppings and a creamy drizzle.","cheese sticks":"Golden breaded cheese sticks served with a tangy dipping sauce.","onion rings":"Crispy battered onion rings served with a creamy dip.",
  "beef tapa":"Tender marinated beef tapa with garlic rice and a fried egg.","longganisa":"Sweet and savory longganisa with garlic rice and a fried egg.","porkchop":"Pan-fried porkchop with garlic rice and a fried egg.","liempo":"Grilled pork belly (liempo) with garlic rice and a fried egg.","shanghai":"Crispy fried lumpiang Shanghai with garlic rice and a fried egg.","hungarian":"Smoky Hungarian sausage with garlic rice and a fried egg.","chicken":"Crispy fried chicken with garlic rice and a fried egg.","tocino":"Sweet cured pork tocino with garlic rice and a fried egg.","tonkatsu":"Breaded, deep-fried pork cutlet with garlic rice and a fried egg.","spam silog":"Pan-seared Spam with garlic rice and a fried egg.",
  "egg":"Extra fried egg.","rice":"Extra serving of garlic rice.","sauce/dip":"Extra dipping sauce.","espresso shot":"Add a shot of espresso to any drink.","syrup/sauce":"Add flavored syrup or sauce to any drink."};
+let REC=[],RECKEY="";
+async function loadRec(){const ids=Object.keys(cart),key=ids.map(i=>baseName(cart[i].n).replace(/\s*\([^)]*\)\s*$/,"")).sort().join(",");
+ if(key==RECKEY)return;RECKEY=key;if(!key){REC=[];return}
+ try{const r=await api("/api/recommend?items="+encodeURIComponent(key));if(key!=RECKEY)return;REC=(r||[]).map(n=>allItems().find(m=>m.on&&baseName(m.n).toLowerCase()==n.toLowerCase())).filter(m=>m&&!ids.some(i=>baseName(cart[i].n)==baseName(m.n)));draw()}catch(e){}}
 const baseName=n=>n.replace(/\s*\((Hot|Iced)\)\s*$/i,"");
 const imgSlug=n=>{const b=baseName(n).toLowerCase(),al={"nachos overload":"nachos","cheese sticks":"cheese-stick","onion rings":"onion-rings","hob's drink":"hob"};return al[b]||b.replace(/[^a-z0-9]+/g,"-").replace(/^-|-$/g,"")};
 const dsc=m=>{const d=DESC[baseName(m.n).toLowerCase()];if(d)return d;const t=/\(Hot\)/.test(m.n)?"served hot":/\(Iced\)/.test(m.n)?"served over ice":"";
@@ -383,6 +390,7 @@ function vOrder(){
  ${OT=="Dine-in"?(ORS?"":`<label for="ct">Table selector</label><select id="ct">${TABLES.map(t=>`<option value="${t.no}" ${t.no==selTable?"selected":""}>Table ${t.no} (${t.seats} seats)</option>`).join("")}</select>`):`<p class="empty" style="margin:10px 0 0">Takeout needs no table. Pick up your order at the counter.</p>`}
  <label for="onotes">Special instructions / notes</label><textarea id="onotes" rows="2" maxlength="300" placeholder="Special instructions...">${esc(NOTES)}</textarea>
  <div class="scroll olist">${ids.length?ids.map(i=>`<div class="row"><span class="nm">${esc(cart[i].n)} × ${cart[i].q}</span><span><b>${peso(cart[i].p*cart[i].q)}</b> <button class="btn" data-dec="${i}" aria-label="Remove one">−</button></span></div>`).join(""):`<p class="empty">Nothing yet. Add a dish from the menu.</p>`}</div>
+ ${REC.length&&ids.length?`<div class="goes"><b>Goes well with</b><div class="chips">${REC.map(m=>`<button class="btn" data-add="${m.id}">+ ${esc(baseName(m.n))}</button>`).join("")}</div></div>`:""}
  <div class="ofoot"><div class="row"><b>Total</b><b class="tot">${peso(sum)}</b></div>
  <button class="btn p" id="place" style="width:100%;margin-top:6px" ${ids.length?"":"disabled"}>Place order</button><div class="fmsg" id="fm-order"></div></div></section></div>`}
 function vReserve(){

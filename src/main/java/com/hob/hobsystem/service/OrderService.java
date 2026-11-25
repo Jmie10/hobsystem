@@ -15,12 +15,14 @@ import java.util.List;
 @Service
 public class OrderService {
     private final OrderRepository repo;
+    private final RecommendService rec;
 
     /** QUEUE (private = ENCAPSULATION): Pending orders wait here, first come first served. Rebuilt from MySQL on startup. */
     private final Deque<Long> kitchenQueue = new ArrayDeque<>();
 
-    public OrderService(OrderRepository repo) {
+    public OrderService(OrderRepository repo, RecommendService rec) {
         this.repo = repo;
+        this.rec = rec;
         for (OrderEntity o : repo.findByStatusOrderByIdAsc("Pending")) kitchenQueue.addLast(o.getId());
     }
 
@@ -46,6 +48,7 @@ public class OrderService {
         }
         o = repo.save(o);
         kitchenQueue.addLast(o.getId());     // enqueue
+        rec.addOrder(o);                     // update the GRAPH
         return o;
     }
 
@@ -82,6 +85,7 @@ public class OrderService {
         if (!"Pending".equals(o.getStatus()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Too late to cancel: the kitchen already started this order.");
         kitchenQueue.remove(id);
+        rec.removeOrder(o);
         repo.delete(o);
     }
 
@@ -92,6 +96,7 @@ public class OrderService {
         if (!"Pending".equals(o.getStatus()))
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Too late to undo: the kitchen already started this order.");
         kitchenQueue.remove(id);
+        rec.removeOrder(o);
         repo.delete(o);
     }
 

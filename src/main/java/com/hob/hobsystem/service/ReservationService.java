@@ -6,6 +6,7 @@ import com.hob.hobsystem.model.Reservation;
 import com.hob.hobsystem.model.WaitlistEntry;
 import com.hob.hobsystem.repository.ReservationRepository;
 import com.hob.hobsystem.repository.WaitlistRepository;
+import com.hob.hobsystem.util.SinglyLinkedList;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -31,14 +32,14 @@ public class ReservationService {
     private final Set<String> bookingKeys = new HashSet<>();
     /** HASHSET: "customerNo|date|time", so one customer cannot book twice at the same time. */
     private final Set<String> personKeys = new HashSet<>();
-    /** QUEUE: customers waiting for a table, first come first served. */
-    private final Deque<WaitlistEntry> waitlist = new ArrayDeque<>();
+    /** LINKED LIST: customers waiting for a table, first come first served. A person in the middle can be unlinked when a table is given to them. */
+    private final SinglyLinkedList<WaitlistEntry> waitlist = new SinglyLinkedList<>();
 
     public ReservationService(ReservationRepository repo, WaitlistRepository waitRepo) {
         this.repo = repo;
         this.waitRepo = waitRepo;
         for (Reservation r : repo.findAllByOrderByIdAsc()) if (!"Cancelled".equals(r.getStatus()) && !"Completed".equals(r.getStatus())) index(r);
-        waitlist.addAll(waitRepo.findAllByOrderByIdAsc());
+        for (WaitlistEntry w : waitRepo.findAllByOrderByIdAsc()) waitlist.addLast(w);
     }
 
     public List<Reservation> all() { return repo.findAllByOrderByIdAsc(); }
@@ -47,10 +48,10 @@ public class ReservationService {
         return repo.findAllByOrderByIdAsc().stream().filter(r -> customerId.equals(r.getCustomerId())).toList();
     }
 
-    public synchronized List<WaitlistEntry> waitlist() { return new ArrayList<>(waitlist); }
+    public synchronized List<WaitlistEntry> waitlist() { return waitlist.toList(); }
 
     public synchronized List<WaitlistEntry> waitlistFor(Long customerId) {
-        return waitlist.stream().filter(w -> customerId.equals(w.getCustomerId())).toList();
+        return waitlist.toList().stream().filter(w -> customerId.equals(w.getCustomerId())).toList();
     }
 
     /** Builds the table ARRAY with live status for one date and time. */
@@ -148,7 +149,7 @@ public class ReservationService {
             WaitlistEntry w = it.next();
             if (w.getBookingDate().equals(r.getBookingDate()) && w.getBookingTime().equals(r.getBookingTime())
                     && w.getGuests() <= SEATS[r.getTableNo() - 1]) {
-                it.remove();                       // dequeue from the waitlist
+                it.remove();                       // unlink this node from the waitlist
                 waitRepo.delete(w);
                 Reservation promoted = new Reservation(w.getName(), r.getTableNo(), w.getBookingDate(), w.getBookingTime(), w.getGuests());
                 promoted.assignCustomer(w.getCustomerId(), w.getCustomerNo());
@@ -167,7 +168,7 @@ public class ReservationService {
         WaitlistEntry nw = new WaitlistEntry(u.getName(), date, time, guests);
         nw.assignCustomer(u.getId(), u.getCustomerNo());
         WaitlistEntry w = waitRepo.save(nw);
-        waitlist.addLast(w);                       // enqueue
+        waitlist.addLast(w);                       // add a new node at the tail
         return w;
     }
 
