@@ -1,23 +1,17 @@
 package com.hob.hobsystem.util;
 
 import java.util.*;
-
-/**
- * GRAPH: undirected, weighted, stored as an adjacency list (Map of Map).
- * Each vertex is a menu item. An edge A-B means "A and B were ordered together";
- * its weight is how many orders contained both.
- */
+//GRAPH
 public class WeightedGraph<T> {
     private final Map<T, Map<T, Integer>> adj = new HashMap<>();
 
-    /** Adds 1 to the weight of the edge a-b (creates it if missing). */
+
     public void addEdge(T a, T b) {
         if (a.equals(b)) return;
         adj.computeIfAbsent(a, k -> new HashMap<>()).merge(b, 1, Integer::sum);
         adj.computeIfAbsent(b, k -> new HashMap<>()).merge(a, 1, Integer::sum);
     }
 
-    /** Subtracts 1 from the weight of the edge a-b; removes the edge when it reaches 0. */
     public void removeEdge(T a, T b) {
         dec(a, b);
         dec(b, a);
@@ -39,7 +33,7 @@ public class WeightedGraph<T> {
 
     public int vertexCount() { return adj.size(); }
 
-    /** Neighbors of one vertex, strongest edge first. */
+ 
     public List<Map.Entry<T, Integer>> neighbors(T v) {
         Map<T, Integer> m = adj.get(v);
         if (m == null) return List.of();

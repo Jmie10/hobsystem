@@ -19,7 +19,7 @@ import java.util.*;
 
 @Service
 public class ReservationService {
-    /** ARRAY: seats of each table (Table 1 = 2 seats, ... Table 8 = 8 seats). */
+    // ARRAY
     public static final int[] SEATS = {2, 2, 4, 4, 4, 6, 6, 8};
     public static final int TABLE_COUNT = SEATS.length;
     /** House of Brew is open 6:00 PM to 3:00 AM. Times after midnight belong to the same night. */
@@ -28,11 +28,11 @@ public class ReservationService {
     private final ReservationRepository repo;
     private final WaitlistRepository waitRepo;
 
-    /** HASHSET (private = ENCAPSULATION): "table|date|time" of active bookings, for instant double-booking checks. */
+    //HASHSET
     private final Set<String> bookingKeys = new HashSet<>();
-    /** HASHSET: "customerNo|date|time", so one customer cannot book twice at the same time. */
+    //HASHSET
     private final Set<String> personKeys = new HashSet<>();
-    /** LINKED LIST: customers waiting for a table, first come first served. A person in the middle can be unlinked when a table is given to them. */
+   //LINKED LIST
     private final SinglyLinkedList<WaitlistEntry> waitlist = new SinglyLinkedList<>();
 
     public ReservationService(ReservationRepository repo, WaitlistRepository waitRepo) {
@@ -142,7 +142,7 @@ public class ReservationService {
         promoteWaitlist(r);
         return r;
     }
-
+//HASHSET
     private void promoteWaitlist(Reservation r) {
         Iterator<WaitlistEntry> it = waitlist.iterator();
         while (it.hasNext()) {

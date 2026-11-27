@@ -17,7 +17,7 @@ public class OrderService {
     private final OrderRepository repo;
     private final RecommendService rec;
 
-    /** QUEUE (private = ENCAPSULATION): Pending orders wait here, first come first served. Rebuilt from MySQL on startup. */
+    // QUEUE
     private final Deque<Long> kitchenQueue = new ArrayDeque<>();
 
     public OrderService(OrderRepository repo, RecommendService rec) {

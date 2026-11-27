@@ -4,7 +4,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
-/** Node of the menu TREE: Menu -> Category -> Item. ENCAPSULATION: children change only through addChild(). */
+//TREE
 public class MenuNode {
     private Long id;            // only set on item (leaf) nodes
     private final String name;

@@ -10,8 +10,7 @@ import java.util.Map;
 @Service
 public class UndoService {
     public record UndoAction(String type, Long id) {}
-
-    /** STACK: one undo stack per browser (client id). push = new action, pop = Undo. */
+    //STACK
     private final Map<String, Deque<UndoAction>> stacks = new HashMap<>();
 
     public synchronized void push(String client, String type, Long id) {
